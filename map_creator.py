@@ -24,6 +24,8 @@ output is in ./computed_output
 """
 
 import argparse
+from collections import namedtuple
+from lxml import etree
 import os
 import sys
 
@@ -34,17 +36,58 @@ MSG_ERROR_NONEXISTENT_FILE = 'Error: nonexistent input file\n'
 OUTPUT_DIR = 'computed_output'
 OUTPUT_DAT = 'dat'
 
+nrml_ns = '{http://openquake.org/xmlns/nrml/0.2}'
+
+lm_node = '%sLMNode' % nrml_ns
+
+pos_node = '{http://www.opengis.net/gml}pos'
+
+loss_node_elem = '%sloss' % nrml_ns
+
+mean_node = '%smean' % nrml_ns
+
+Entry = namedtuple('Entry', 'lon, lat, sum_mean')
+
+
 def build_cmd_parser():
-        parser = argparse.ArgumentParser(prog='MapCreator')
-        parser.add_argument('-i', '--input-file',
-                            dest='input_file',
-                            nargs=1,
-                            metavar='input file',
-                            help='Specify the input file (i.e. loss_map.xml)')
-        parser.add_argument('-v', '--version',
-                            action='version',
-                            version="%(prog)s 0.0.1")
-        return parser
+    parser = argparse.ArgumentParser(prog='MapCreator')
+
+    parser.add_argument('-i', '--input-file',
+                        nargs=1,
+                        metavar='input file',
+                        dest='input_file',
+                        help='Specify the input file (i.e. loss_map.xml)')
+
+    parser.add_argument('-r', '--res',
+                        nargs=1,
+                        default=0.5,
+                        type=float,
+                        help='resolution of each dot',
+                        metavar='value',
+                        dest='resolution')
+
+    parser.add_argument('-min', "--min-val",
+                        nargs=1,
+                        default=100.0,
+                        type=float,
+                        help='minimum value in a loss map',
+                        metavar='value',
+                        dest='min-val')
+
+    parser.add_argument('-max', '--max-val',
+                        nargs=1,
+                        default=1000000000.0,
+                        type=float,
+                        help='maximum value in a loss map',
+                        metavar='value',
+                        dest='max-val')
+
+    parser.add_argument('-v', '--version',
+                        action='version',
+                        version="%(prog)s 0.0.1")
+
+    return parser
+
 
 def create_output_folders():
     output_dir = os.path.join(OUTPUT_DIR, OUTPUT_DAT)
@@ -52,44 +95,47 @@ def create_output_folders():
     if no_folder:
         os.makedirs(output_dir)
 
+
 def compute_map(loss_map_file_name):
 
-    with open(loss_map_file_name) as file_to_read:
-        lines = file_to_read.readlines()
-
-    no = len(lines)
-    latitude = []
-    longitude =[]
-    values = []
-    no_assets = 0
     output_file_name = loss_map_file_name[0:-4] + '.txt'
     compute_map_output = os.path.join(OUTPUT_DIR, OUTPUT_DAT, output_file_name)
-    with open(compute_map_output,"w") as out_file:
-        for i in range(no):
-            if lines[i].strip()[:7] == '<LMNode':
-                j=1
-                sub_value = 0.0
-                while lines[i+j].strip()[:8] != '</LMNode':
-                    if lines[i+j].strip()[:9] == '<gml:pos>':
-                        coordinates = lines[i+j].strip()\
-                                    .replace('<gml:pos>','')\
-                                    .replace('</gml:pos>','').split()
-                    if lines[i+j].strip()[:6] == '<mean>':
-                        sub_value = sub_value + float(lines[i+j].strip()\
-                                   .replace('<mean>','')\
-                                   .replace('</mean>',''))
-                        no_assets = no_assets+1
-                    j=j+1
-
-                latitude.append(coordinates[1])
-                longitude.append(coordinates[0])
-                values.append(sub_value)
-
-        out_file.write('x,y,value\n')
-        for i in range(len(values)):
-            out_file.write(longitude[i]+','+latitude[i]+','
-                           + str(values[i])+'\n')
+    write_loss_map_entries(compute_map_output,
+            read_loss_map_entries(loss_map_file_name))
     create_map(OUTPUT_DIR, compute_map_output)
+
+
+def read_loss_map_entries(loss_map_xml):
+
+    entries = []
+
+    elem = 1
+
+    with open('loss-map.xml') as loss_file:
+        for node in etree.iterparse(loss_file):
+            if node[elem].tag == lm_node:
+                lon, lat = node[elem].find('.//%s' % pos_node).text.split()
+
+                loss_nodes = node[elem].findall('.//%s' % loss_node_elem)
+
+                sum_mean = 0
+                for loss_node in loss_nodes:
+                    sum_mean += float(loss_node.find('.//%s' % mean_node).text)
+
+                entries.append(Entry(lon, lat, sum_mean))
+
+    return entries
+
+
+def write_loss_map_entries(output_filename, loss_entries):
+
+    with open(output_filename, 'w') as out_file:
+        out_file.write('x,y,value\n')
+        for entry in loss_entries:
+            entry_string = ','.join(
+                [entry.lon, entry.lat, str(entry.sum_mean)]) + '\n'
+            out_file.write(entry_string)
+
 
 def main():
 
@@ -100,11 +146,11 @@ def main():
         args = parser.parse_args()
         if args.input_file != None:
             if os.path.exists(args.input_file[0]):
-                    create_output_folders()
-                    compute_map(args.input_file[0])
+                create_output_folders()
+                compute_map(args.input_file[0])
             else:
                 print MSG_ERROR_NONEXISTENT_FILE
                 parser.print_help()
 
-if __name__== '__main__':
+if __name__ == '__main__':
     main()
