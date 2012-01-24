@@ -105,7 +105,7 @@ def create_output_folders():
 
 
 def compute_map(loss_map_file_name, args):
-    output_file_name = loss_map_file_name[0:-4] + '.txt'
+    output_file_name = os.path.basename(loss_map_file_name)[0:-4] + '.txt'
     compute_map_output = os.path.join(OUTPUT_DIR, OUTPUT_DAT, output_file_name)
     write_loss_map_entries(compute_map_output,
             read_loss_map_entries(loss_map_file_name))
