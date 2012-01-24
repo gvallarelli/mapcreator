@@ -23,13 +23,14 @@ TODO: Add description
 
 import os
 import re
+import math
 
 
-def create_map(output_dir, compute_map_output):
+def create_map(output_dir, compute_map_output, res, min_val, max_val):
 
     #gmtset commands
-    os.system("gmtset GRID_CROSS_SIZE_PRIMARY = 0.2i") 
-    os.system("gmtset BASEMAP_TYPE            = PLAIN") 
+    os.system("gmtset GRID_CROSS_SIZE_PRIMARY = 0.2i")
+    os.system("gmtset BASEMAP_TYPE            = PLAIN")
     os.system("gmtset HEADER_FONT_SIZE        = 12p")
     os.system("gmtset PAPER_MEDIA             = a4+")
     os.system("gmtset HEADER_FONT             = 22")
@@ -40,41 +41,49 @@ def create_map(output_dir, compute_map_output):
     os.system("gmtset PS_IMAGE_FORMAT         = hex")
 
     tmp = os.path.join(output_dir, ".tmp")
-    cmd = "minmax -m -C " + compute_map_output + " > " + tmp   
+    cmd = "minmax -m -C " + compute_map_output + " > " + tmp
     os.system(cmd)
     with open(tmp, 'rb') as tmp_file:
-        line = tmp_file.readline() 
-        aa = re.split("\s+",line)
+        line = tmp_file.readline()
+        aa = re.split("\s+", line)
+
     # Define the extension
-    ext = "%.2f/%.2f/%.2f/%.2f" % \
-	    (float(aa[0]),float(aa[1]),float(aa[2]),float(aa[3]))
+    ext = "%.2f/%.2f/%.2f/%.2f" % (
+        float(aa[0]), float(aa[1]), float(aa[2]), float(aa[3]))
 
     # Plotting
     plot_map_file_name = os.path.join(output_dir, 'map.eps')
-    cmd = "pscoast -P -R"+ext+" -X7.0c -JM9 -Df -Na -G230 -V -K > %s" % plot_map_file_name 
-    #cmd = "pscoast -R"+ext+" -X4.0c -JM15 -Df -Na -G230 -V -K > tmp.eps" 
-    #cmd = "pscoast -R"+ext+" -X4.0c -JM15 -W -Df -Na -G230 -V -K -B0.25/0.25/25 -O -Slightblue> tmp.eps" 
+    cmd = "pscoast -P -R" + ext + " -X7.0c -JM9 -Df -Na -G230 -V -K > %s" % (
+        plot_map_file_name)
     os.system(cmd)
-	
-    # Create grid 
+
+    # Create grid
     awkcmd = "gawk '{print $1, $2, $3}' " + compute_map_output
     os.system(awkcmd)
-	
-    # Create cpt 
-    #cptfile = "./cpt/ad-a.cpt";
-    cptfile = "./cpt/YlOrRd_09.cpt" 
+
+    # Create cpt
+    cptfile = "./cpt/YlOrRd_09.cpt"
     cptf = "./cpt/Blues_08.cpt"
-    #cmd = "makecpt -C"+cptfile+" -T0/11/1 -Q -D255/255/255 > "+cptf
-    cmd = "makecpt -C"+cptfile+" -T6/9/1 -Q -D255/255/255 > "+cptf
+    min_val = "%.2e" % int(math.log10(min_val))
+    max_val = "%.2e" % int(math.log10(max_val))
+
+    cmd = "makecpt -C" + cptfile + " -T" + min_val + "/" + max_val \
+        + "/1 -Q -D255/255/255 > " + cptf
     os.system(cmd)
 
     # Plot map
-    #cmd = "gawk '{print $1, $2, $3}' "+compute_map_output+" | psxy -JM -O -K -R"+ext+" -C"+cptf+" -Ss0.5  >> %s" % plot_map_file_name
-    cmd = "gawk '{print $1, $2, $3/1000}' "+compute_map_output+" | psxy -JM -O -K -R"+ ext +" -C"+cptf+" -Ss1.0  >> %s" % plot_map_file_name
+    res = "%.2f" % res
+
+    cmd = "gawk '{print $1, $2, $3/1000}' " + compute_map_output + \
+        " | psxy -JM -O -K -R" + ext + " -C" + cptf + " -Ss" + res + \
+        "  >> %s" % plot_map_file_name
     os.system(cmd)
 
-    cmd = "psscale -D4/-1/13c/0.3ch -N1 -O -K -Q -C"+cptf+" -B::/::>> %s" % plot_map_file_name
+    cmd = "psscale -D4/-1/13c/0.3ch -N1 -O -K -Q -C" + cptf + \
+        " -B::/::>> %s" % plot_map_file_name
     os.system(cmd)
 
-    cmd = "pscoast -R"+ext+" "+" -JM -W -Df -Na -V -B0.25/0.25/25 -O -Slightblue >> %s" % plot_map_file_name
+    cmd = "pscoast -R" + ext + " " + \
+        " -JM -W -Df -Na -V -B0.25/0.25/25 -O -Slightblue >> %s" % (
+        plot_map_file_name)
     os.system(cmd)
