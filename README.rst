@@ -11,8 +11,8 @@ Usage with optional arguments ::
 
 Default values for optional arguments are:
 
-- `-r or --res` resolution 0.5
-- `-min or --min-val` minimum value 100.0
-- `-max or --max-val` maximum value 1000000000.0
+- *-r or --res* resolution 0.5
+- *-min or --min-val* minimum value 100.0
+- *-max or --max-val* maximum value 1000000000.0
 
 .. _gmt: http://gmt.soest.hawaii.edu/
